@@ -15,8 +15,25 @@
 #define VERSION "Ver 0.2"
 #define MODIFIED "2020-03-06"
 
-//#include <SPI.h>
+#include <SPI.h>
 #include <SD.h>
+
+#include <Adafruit_MAX31865.h>
+// Use software SPI: CS, DI, DO, CLK
+Adafruit_MAX31865 max = Adafruit_MAX31865(7, 11, 12, 13);
+// The value of the Rref resistor. Use 430.0 for PT100 and 4300.0 for PT1000
+#define RREF      430.0
+// The 'nominal' 0-degrees-C resistance of the sensor
+// 100.0 for PT100, 1000.0 for PT1000
+#define RNOMINAL  100.0
+
+#include <DHT.h>;
+//Constants
+#define DHT1PIN 5     // what pin we're connected to
+#define DHT2PIN 4     // what pin we're connected to
+#define DHTTYPE DHT22   // DHT 22  (AM2302)
+DHT dht1(DHT1PIN, DHTTYPE); //// Initialize DHT sensor for normal 16mhz Arduino
+DHT dht2(DHT2PIN, DHTTYPE); //// Initialize DHT sensor for normal 16mhz Arduino
 
 float T1 = 0.0;
 float H1 = 0.0;
@@ -25,6 +42,8 @@ float H2 = 0.0;
 float TS = 0.0;
 float PR = 0.0;
 
+float LO_TEMP = 36.0;
+float HI_TEMP = 38.0;
 
 bool bSDLogFail = false;
 int  iToggle = 0;
@@ -47,7 +66,7 @@ DateTime now;
 
 #include <LiquidCrystal.h>
 
-const int rs = 8, en = 9, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
+const int rs = 8, en = 9, d4 = A3, d5 = A2, d6 = A1, d7 = A0;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 void setup()
@@ -59,8 +78,14 @@ void setup()
     ; // wait for serial port to connect. Needed for native USB port only
   }
 
-  Wire.begin(); // fix weird characters in LCD display?
+  Wire.begin();
 
+  max.begin(MAX31865_3WIRE);
+
+  dht1.begin();
+  dht2.begin();
+  
+  lcd.begin(16, 2);
 
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
@@ -111,14 +136,14 @@ void setup()
   LCDPrintTwoDigits(now.minute());
   delay(2000);
 
-  SetupSDCardOperations();
+//  SetupSDCardOperations();
 
   lcd.clear();
   lcd.setCursor(0,0);
-  lcd.print(F("T1_ H1_ T2_ H2_ "));
+  lcd.print(F("H1_ T1_ H2_ T2_ "));
   lcd.setCursor(0,1);
   lcd.print(F("TS_ PR_ HH MM SS"));  
-  delay(4000);  
+  delay(4000); 
 }
 
 void loop()
@@ -260,36 +285,45 @@ void SetupSDCardOperations()
   lcd.print(F("SD Init Finish  "));
   delay(2000);
   lcd.clear();
-  LCDDigitalOutputUpdate();
+  
   LCDStatusUpdate_SDLogging(F("StartUp ")); 
 }
 
 
 void LCDDigitalOutputUpdate()
 {
+  H1 = dht1.readHumidity();
+  T1 = dht1.readTemperature();
+  H2 = dht2.readHumidity();
+  T2 = dht2.readTemperature();
+  
+  TS = GetWaterTempSensor();
+
   DateTime now = rtc.now();      
   lcd.setCursor(8,1);
   LCDPrintTwoDigits(now.hour());
-  lcd.print(F(" "));
+  lcd.print(F(":"));
   LCDPrintTwoDigits(now.minute());   
-  lcd.print(F(" "));
+  lcd.print(F(":"));
   LCDPrintTwoDigits(now.second());   
 
+  // "H1_ T1_ H2_ T2_ "
+  // "TS_ PR_ HH MM SS"
+
   lcd.setCursor(0, 0);
+  LCDPrintThreeDigits(H1);
+  lcd.print(F(" "));  
   LCDPrintThreeDigits(T1);
-//  lcd.print(F("XXX"));  
   lcd.print(F(" "));  
-  lcd.print(F("XXX"));  
+  LCDPrintThreeDigits(H2);
   lcd.print(F(" "));  
-  lcd.print(F("XXX"));  
-  lcd.print(F(" "));  
-  lcd.print(F("XXX"));  
+  LCDPrintThreeDigits(T2);
   lcd.print(F(" "));  
   lcd.setCursor(0, 1);
-  lcd.print(F("XXX"));  
+  LCDPrintThreeDigits(TS);
   lcd.print(F(" "));  
-  lcd.print(F("XXX"));  
-  lcd.print(F(" "));  
+  LCDPrintThreeDigits(PR);
+  lcd.print(F(" ")); 
 }
 
 void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
@@ -356,4 +390,51 @@ void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
       lcd.print(F("Open LOGGING.CSV"));
     }  
   }
+}
+
+float GetWaterTempSensor()
+{
+  float celsius = 0.0;
+  // Call watertempsensor.requestTemperatures() to issue a global temperature and Requests to all devices on the bus
+//  watertempsensor.requestTemperatures(); 
+//  celsius = watertempsensor.getTempCByIndex(0);
+
+  uint16_t rtd = max.readRTD();
+  double temp = max.temperature(RNOMINAL, RREF);
+  uint8_t fault = false;
+
+//  Serial.print("RTD value: "); Serial.println(rtd);
+  float ratio = rtd;
+  ratio /= 32768;
+//  Serial.print("Ratio = "); Serial.println(ratio,8);
+//  Serial.print("Resistance = "); Serial.println(RREF*ratio,8);
+//  Serial.print("Temperature = "); Serial.println(max.temperature(RNOMINAL, RREF));
+  
+
+  fault = max.readFault();
+  if (fault) 
+  {
+    Serial.print(" Fault 0x"); Serial.print(fault, HEX);
+    if (fault & MAX31865_FAULT_HIGHTHRESH) {
+      Serial.println(" RTD High Threshold"); 
+    }
+    if (fault & MAX31865_FAULT_LOWTHRESH) {
+      Serial.println(" RTD Low Threshold"); 
+    }
+    if (fault & MAX31865_FAULT_REFINLOW) {
+      Serial.println(" REFIN- > 0.85 x Bias"); 
+    }
+    if (fault & MAX31865_FAULT_REFINHIGH) {
+      Serial.println(" REFIN- < 0.85 x Bias - FORCE- open"); 
+    }
+    if (fault & MAX31865_FAULT_RTDINLOW) {
+      Serial.println(" RTDIN- < 0.85 x Bias - FORCE- open"); 
+    }
+    if (fault & MAX31865_FAULT_OVUV) {
+      Serial.println(" Under/Over voltage"); 
+    }
+    max.clearFault();
+  }
+
+  return (temp);
 }
