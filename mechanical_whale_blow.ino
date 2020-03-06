@@ -45,6 +45,8 @@ float PR = 0.0;
 float LO_TEMP = 36.0;
 float HI_TEMP = 38.0;
 
+bool bHeat = false;
+
 bool bSDLogFail = false;
 int  iToggle = 0;
 
@@ -253,7 +255,7 @@ void SetupSDCardOperations()
     fileSDCard = SD.open("LOGGING.CSV", FILE_WRITE);
     if (fileSDCard) 
     {
-      fileSDCard.println(F("\"Date\",\"Time\",\"OP\",\"T1\",\"H1\",\"T2\",\"H2\",\"TS\",\"P\""));
+      fileSDCard.println(F("\"Date\",\"Time\",\"OP\",\"H1\",\"T1\",\"H2\",\"T2\",\"TS\",\"PR\""));
       // OP:
       // Startup
       // HeatON
@@ -298,7 +300,18 @@ void LCDDigitalOutputUpdate()
   T2 = dht2.readTemperature();
   
   TS = GetWaterTempSensor();
-
+  if (TS < LO_TEMP)
+  {
+    bHeat = true;
+    Serial.println("HeatON");
+  }
+  else
+  if (TS > HI_TEMP)
+  {
+    bHeat = false;
+    Serial.println("HeatOFF");
+  }  
+  
   DateTime now = rtc.now();      
   lcd.setCursor(8,1);
   LCDPrintTwoDigits(now.hour());
@@ -324,19 +337,21 @@ void LCDDigitalOutputUpdate()
   lcd.print(F(" "));  
   LCDPrintThreeDigits(PR);
   lcd.print(F(" ")); 
+
+  LCDStatusUpdate_SDLogging(bHeat ? F("HeatON") : F("HeatOFF"));
 }
 
 void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
 {
-  lcd.setCursor(0, 1);
-  lcd.print(status);
+//  lcd.setCursor(0, 1);
+//  lcd.print(status);
 
   DateTime now = rtc.now();      
   lcd.setCursor(8,1);
   LCDPrintTwoDigits(now.hour());
-  lcd.print(F(" "));
+  lcd.print(F(":"));
   LCDPrintTwoDigits(now.minute());   
-  lcd.print(F(" "));
+  lcd.print(F(":"));
   LCDPrintTwoDigits(now.second());   
 
   if (!SD.begin(chipSelectSDCard)) 
@@ -360,6 +375,7 @@ void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
     // if the file opened okay, write to it:
     if (fileSDCard) 
     {
+//    (F("\"Date\",\"Time\",\"OP\",\"H1\",\"T1\",\"H2\",\"T2\",\"TS\",\"PR\""));
       fileSDCard.print(now.year(), DEC);
       fileSDCard.print("/");
       fileSDCard.print(now.month(), DEC);
@@ -367,16 +383,25 @@ void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
       fileSDCard.print(now.day(), DEC);
       fileSDCard.print(",");
       fileSDCard.print(now.hour(), DEC);
-      fileSDCard.print(":");
+      fileSDCard.print(" ");
       fileSDCard.print(now.minute(), DEC);
-      fileSDCard.print(":");
+      fileSDCard.print(" ");
       fileSDCard.print(now.second(), DEC);
       fileSDCard.print(",");
-      //SDPrintBinary(digitalOutputState,5);
-      fileSDCard.print(",");
-      //SDPrintBinary(digitalInputState_Saved,4);
-      fileSDCard.print(",");
       fileSDCard.print(status);
+      fileSDCard.print(",");
+      fileSDCard.print(H1);
+      fileSDCard.print(",");
+      fileSDCard.print(T1);
+      fileSDCard.print(",");
+      fileSDCard.print(H2);
+      fileSDCard.print(",");
+      fileSDCard.print(T2);
+      fileSDCard.print(",");
+      fileSDCard.print(TS);
+      fileSDCard.print(",");
+      fileSDCard.print(PR);
+      
       fileSDCard.println("");
       fileSDCard.close();
       SD.end();
