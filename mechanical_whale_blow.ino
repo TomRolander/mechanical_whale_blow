@@ -12,8 +12,8 @@
 
  **************************************************************************/
 
-#define VERSION "Ver 0.1"
-#define MODIFIED "2020-03-05"
+#define VERSION "Ver 0.2"
+#define MODIFIED "2020-03-06"
 
 //#include <SPI.h>
 #include <SD.h>
