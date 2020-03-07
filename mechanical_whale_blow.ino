@@ -20,7 +20,7 @@
 
 #include <Adafruit_MAX31865.h>
 // Use software SPI: CS, DI, DO, CLK
-Adafruit_MAX31865 max = Adafruit_MAX31865(7, 11, 12, 13);
+Adafruit_MAX31865 max = Adafruit_MAX31865(3, 11, 12, 13);
 // The value of the Rref resistor. Use 430.0 for PT100 and 4300.0 for PT1000
 #define RREF      430.0
 // The 'nominal' 0-degrees-C resistance of the sensor
@@ -35,12 +35,14 @@ Adafruit_MAX31865 max = Adafruit_MAX31865(7, 11, 12, 13);
 DHT dht1(DHT1PIN, DHTTYPE); //// Initialize DHT sensor for normal 16mhz Arduino
 DHT dht2(DHT2PIN, DHTTYPE); //// Initialize DHT sensor for normal 16mhz Arduino
 
+const int heaterPin =  6;
+
 float T1 = 0.0;
 float H1 = 0.0;
 float T2 = 0.0;
 float H2 = 0.0;
-float TS = 0.0;
 float PR = 0.0;
+float TS = 0.0;
 
 float LO_TEMP = 36.0;
 float HI_TEMP = 38.0;
@@ -68,7 +70,7 @@ DateTime now;
 
 #include <LiquidCrystal.h>
 
-const int rs = 8, en = 9, d4 = A3, d5 = A2, d6 = A1, d7 = A0;
+const int rs = 8, en = 9, d4 = A3, d5 = A2, d6 = A1, d7 = 2;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 void setup()
@@ -82,11 +84,14 @@ void setup()
 
   Wire.begin();
 
+  pinMode(heaterPin, OUTPUT);
+  digitalWrite(heaterPin, LOW);
+
   max.begin(MAX31865_3WIRE);
 
   dht1.begin();
   dht2.begin();
-  
+
   lcd.begin(16, 2);
 
   // set up the LCD's number of columns and rows:
@@ -138,14 +143,14 @@ void setup()
   LCDPrintTwoDigits(now.minute());
   delay(2000);
 
-//  SetupSDCardOperations();
+  //  SetupSDCardOperations();
 
   lcd.clear();
-  lcd.setCursor(0,0);
+  lcd.setCursor(0, 0);
   lcd.print(F("H1_ T1_ H2_ T2_ "));
-  lcd.setCursor(0,1);
-  lcd.print(F("TS_ PR_ HH MM SS"));  
-  delay(4000); 
+  lcd.setCursor(0, 1);
+  lcd.print(F("PR_ TS_ HH MM SS"));
+  delay(4000);
 }
 
 void loop()
@@ -194,24 +199,24 @@ void SetupSDCardOperations()
   lcd.setCursor(0, 0);
   lcd.print(F("* Test clock.csv"));
   lcd.setCursor(0, 1);
-  if (SD.exists("clock.csv")) 
+  if (SD.exists("clock.csv"))
   {
     lcd.print(F("  Set Clock     "));
     delay(2000);
 
     fileSDCard = SD.open("clock.csv");
-    if (fileSDCard) 
+    if (fileSDCard)
     {
       if (fileSDCard.available())
       {
         char strClockSetting[128];
         fileSDCard.read(strClockSetting, sizeof(strClockSetting));
         strClockSetting[sizeof(strClockSetting)] = '\0';
-        int iDateTime[6] = {0,0,0,0,0,0};
-        char *ptr1 = &strClockSetting[0];      
-        for (int i=0; i<6; i++)
+        int iDateTime[6] = {0, 0, 0, 0, 0, 0};
+        char *ptr1 = &strClockSetting[0];
+        for (int i = 0; i < 6; i++)
         {
-          char *ptr2 = strchr(ptr1,',');
+          char *ptr2 = strchr(ptr1, ',');
           if (ptr2 != 0)
           {
             *ptr2 = '\0';
@@ -223,39 +228,39 @@ void SetupSDCardOperations()
             break;
           }
         }
-          
-        rtc.adjust(DateTime(iDateTime[0],iDateTime[1],iDateTime[2],iDateTime[3],iDateTime[4],iDateTime[5]));
+
+        rtc.adjust(DateTime(iDateTime[0], iDateTime[1], iDateTime[2], iDateTime[3], iDateTime[4], iDateTime[5]));
         SD.remove("clock.csv");
 
         lcd.setCursor(0, 1);
         lcd.print(F("* removed *     "));
         delay(2000);
-      
+
       }
       fileSDCard.close();
-    } 
-    
-  } else 
+    }
+
+  } else
   {
     lcd.print(F("* does not exist"));
   }
   delay(2000);
 
-// open the file for reading:
+  // open the file for reading:
   fileSDCard = SD.open("LOGGING.CSV");
-  if (fileSDCard) 
+  if (fileSDCard)
   {
     if (fileSDCard.available())
     {
     }
     fileSDCard.close();
-  } 
+  }
   else
   {
     fileSDCard = SD.open("LOGGING.CSV", FILE_WRITE);
-    if (fileSDCard) 
+    if (fileSDCard)
     {
-      fileSDCard.println(F("\"Date\",\"Time\",\"OP\",\"H1\",\"T1\",\"H2\",\"T2\",\"TS\",\"PR\""));
+      fileSDCard.println(F("\"Date\",\"Time\",\"OP\",\"H1\",\"T1\",\"H2\",\"T2\",\"PR\",\"TS\""));
       // OP:
       // Startup
       // HeatON
@@ -287,8 +292,8 @@ void SetupSDCardOperations()
   lcd.print(F("SD Init Finish  "));
   delay(2000);
   lcd.clear();
-  
-  LCDStatusUpdate_SDLogging(F("StartUp ")); 
+
+  LCDStatusUpdate_SDLogging(F("StartUp "));
 }
 
 
@@ -298,63 +303,68 @@ void LCDDigitalOutputUpdate()
   T1 = dht1.readTemperature();
   H2 = dht2.readHumidity();
   T2 = dht2.readTemperature();
-  
+
   TS = GetWaterTempSensor();
   if (TS < LO_TEMP)
   {
     bHeat = true;
-    Serial.println("HeatON");
+    digitalWrite(heaterPin, HIGH);
+    //Serial.println("HeatON");
   }
-  else
-  if (TS > HI_TEMP)
+  else if (TS > HI_TEMP)
   {
     bHeat = false;
-    Serial.println("HeatOFF");
-  }  
-  
-  DateTime now = rtc.now();      
-  lcd.setCursor(8,1);
+    digitalWrite(heaterPin, LOW);
+    //Serial.println("HeatOFF");
+  }
+
+  PR = GetPressureTransmitter();
+
+  DateTime now = rtc.now();
+  lcd.setCursor(8, 1);
   LCDPrintTwoDigits(now.hour());
   lcd.print(F(":"));
-  LCDPrintTwoDigits(now.minute());   
+  LCDPrintTwoDigits(now.minute());
   lcd.print(F(":"));
-  LCDPrintTwoDigits(now.second());   
+  LCDPrintTwoDigits(now.second());
 
   // "H1_ T1_ H2_ T2_ "
-  // "TS_ PR_ HH MM SS"
+  // "PR_ TS_ HH:MM:SS"
 
   lcd.setCursor(0, 0);
   LCDPrintThreeDigits(H1);
-  lcd.print(F(" "));  
+  lcd.print(F(" "));
   LCDPrintThreeDigits(T1);
-  lcd.print(F(" "));  
+  lcd.print(F(" "));
   LCDPrintThreeDigits(H2);
-  lcd.print(F(" "));  
+  lcd.print(F(" "));
   LCDPrintThreeDigits(T2);
-  lcd.print(F(" "));  
+  lcd.print(F(" "));
   lcd.setCursor(0, 1);
-  LCDPrintThreeDigits(TS);
-  lcd.print(F(" "));  
   LCDPrintThreeDigits(PR);
-  lcd.print(F(" ")); 
+  lcd.print(F(" "));
+  LCDPrintThreeDigits(TS);
+  lcd.print(F(" "));
 
   LCDStatusUpdate_SDLogging(bHeat ? F("HeatON") : F("HeatOFF"));
 }
 
 void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
 {
-//  lcd.setCursor(0, 1);
-//  lcd.print(status);
+  //  lcd.setCursor(0, 1);
+  //  lcd.print(status);
 
-  DateTime now = rtc.now();      
-  lcd.setCursor(8,1);
+  DateTime now = rtc.now();
+  lcd.setCursor(8, 1);
   LCDPrintTwoDigits(now.hour());
   lcd.print(F(":"));
-  LCDPrintTwoDigits(now.minute());   
+  LCDPrintTwoDigits(now.minute());
   lcd.print(F(":"));
-  LCDPrintTwoDigits(now.second());   
+  LCDPrintTwoDigits(now.second());
 
-  if (!SD.begin(chipSelectSDCard)) 
+  return;
+
+  if (!SD.begin(chipSelectSDCard))
   {
     bSDLogFail = true;
     iToggle++;
@@ -368,14 +378,14 @@ void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
   bSDLogFail = false;
   iToggle = 0;
 
-//  if ((strcmp((const char*) status, "") != 0) || bForceOneMinuteLogging)
+  //  if ((strcmp((const char*) status, "") != 0) || bForceOneMinuteLogging)
   {
     fileSDCard = SD.open("LOGGING.CSV", FILE_WRITE);
-  
+
     // if the file opened okay, write to it:
-    if (fileSDCard) 
+    if (fileSDCard)
     {
-//    (F("\"Date\",\"Time\",\"OP\",\"H1\",\"T1\",\"H2\",\"T2\",\"TS\",\"PR\""));
+      //    (F("\"Date\",\"Time\",\"OP\",\"H1\",\"T1\",\"H2\",\"T2\",\"PR\",\"TS\""));
       fileSDCard.print(now.year(), DEC);
       fileSDCard.print("/");
       fileSDCard.print(now.month(), DEC);
@@ -398,68 +408,93 @@ void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
       fileSDCard.print(",");
       fileSDCard.print(T2);
       fileSDCard.print(",");
-      fileSDCard.print(TS);
-      fileSDCard.print(",");
       fileSDCard.print(PR);
-      
+      fileSDCard.print(",");
+      fileSDCard.print(TS);
+
       fileSDCard.println("");
       fileSDCard.close();
       SD.end();
-    } 
-    else 
+    }
+    else
     {
       // if the file didn't open, display an error:
       lcd.setCursor(0, 0);
       lcd.print(F("*** ERROR ***   "));
       lcd.setCursor(0, 1);
       lcd.print(F("Open LOGGING.CSV"));
-    }  
+    }
   }
 }
 
 float GetWaterTempSensor()
 {
+  //  max.begin(MAX31865_3WIRE);
+
   float celsius = 0.0;
   // Call watertempsensor.requestTemperatures() to issue a global temperature and Requests to all devices on the bus
-//  watertempsensor.requestTemperatures(); 
-//  celsius = watertempsensor.getTempCByIndex(0);
+  //  watertempsensor.requestTemperatures();
+  //  celsius = watertempsensor.getTempCByIndex(0);
 
   uint16_t rtd = max.readRTD();
   double temp = max.temperature(RNOMINAL, RREF);
   uint8_t fault = false;
 
-//  Serial.print("RTD value: "); Serial.println(rtd);
+  //  Serial.print("RTD value: "); Serial.println(rtd);
   float ratio = rtd;
   ratio /= 32768;
-//  Serial.print("Ratio = "); Serial.println(ratio,8);
-//  Serial.print("Resistance = "); Serial.println(RREF*ratio,8);
-//  Serial.print("Temperature = "); Serial.println(max.temperature(RNOMINAL, RREF));
-  
+  //  Serial.print("Ratio = "); Serial.println(ratio,8);
+  //  Serial.print("Resistance = "); Serial.println(RREF*ratio,8);
+  //  Serial.print("Temperature = "); Serial.println(max.temperature(RNOMINAL, RREF));
+
 
   fault = max.readFault();
-  if (fault) 
+  if (fault)
   {
     Serial.print(" Fault 0x"); Serial.print(fault, HEX);
     if (fault & MAX31865_FAULT_HIGHTHRESH) {
-      Serial.println(" RTD High Threshold"); 
+      Serial.println(" RTD High Threshold");
     }
     if (fault & MAX31865_FAULT_LOWTHRESH) {
-      Serial.println(" RTD Low Threshold"); 
+      Serial.println(" RTD Low Threshold");
     }
     if (fault & MAX31865_FAULT_REFINLOW) {
-      Serial.println(" REFIN- > 0.85 x Bias"); 
+      Serial.println(" REFIN- > 0.85 x Bias");
     }
     if (fault & MAX31865_FAULT_REFINHIGH) {
-      Serial.println(" REFIN- < 0.85 x Bias - FORCE- open"); 
+      Serial.println(" REFIN- < 0.85 x Bias - FORCE- open");
     }
     if (fault & MAX31865_FAULT_RTDINLOW) {
-      Serial.println(" RTDIN- < 0.85 x Bias - FORCE- open"); 
+      Serial.println(" RTDIN- < 0.85 x Bias - FORCE- open");
     }
     if (fault & MAX31865_FAULT_OVUV) {
-      Serial.println(" Under/Over voltage"); 
+      Serial.println(" Under/Over voltage");
     }
     max.clearFault();
   }
 
   return (temp);
+}
+
+float GetPressureTransmitter()
+{
+  int sensorVal = analogRead(A0);
+  //Serial.print("Sensor Value: ");
+  //Serial.print(sensorVal);
+
+  float voltage = (sensorVal * 5.0) / 1024.0;
+  //Serial.print("  Volts: ");
+  //Serial.print(voltage);
+
+  float pressure_pascal = (3.0 * ((float)voltage - 0.47)) * 1000000.0;
+  float pressure_bar = pressure_pascal / 10e5;
+  //Serial.print("  Pressure = ");
+  //Serial.print(pressure_bar);
+  //Serial.println(" bars");
+
+  //lcd.setCursor(0, 1);
+  //lcd.print(pressure_bar);
+  //lcd.print(" bars");
+
+  return(pressure_bar * 100);
 }
