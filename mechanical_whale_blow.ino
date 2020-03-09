@@ -12,8 +12,8 @@
 
  **************************************************************************/
 
-#define VERSION "Ver 0.2"
-#define MODIFIED "2020-03-06"
+#define VERSION "Ver 0.3"
+#define MODIFIED "2020-03-09"
 
 #include <SPI.h>
 #include <SD.h>
@@ -91,9 +91,7 @@ void setup()
 
   dht1.begin();
   dht2.begin();
-
-  lcd.begin(16, 2);
-
+  
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
   lcd.clear();
@@ -143,7 +141,7 @@ void setup()
   LCDPrintTwoDigits(now.minute());
   delay(2000);
 
-  //  SetupSDCardOperations();
+  SetupSDCardOperations();
 
   lcd.clear();
   lcd.setCursor(0, 0);
@@ -178,6 +176,8 @@ void LCDPrintThreeDigits(float fVal)
 
 void SetupSDCardOperations()
 {
+  return;
+  
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print(F("*** STATUS ***  "));
@@ -199,6 +199,7 @@ void SetupSDCardOperations()
   lcd.setCursor(0, 0);
   lcd.print(F("* Test clock.csv"));
   lcd.setCursor(0, 1);
+  
   if (SD.exists("clock.csv"))
   {
     lcd.print(F("  Set Clock     "));
@@ -239,8 +240,8 @@ void SetupSDCardOperations()
       }
       fileSDCard.close();
     }
-
-  } else
+  }
+  else
   {
     lcd.print(F("* does not exist"));
   }
@@ -318,7 +319,7 @@ void LCDDigitalOutputUpdate()
     //Serial.println("HeatOFF");
   }
 
-  PR = GetPressureTransmitter();
+  PR = GetPressureTransmitterMb();
 
   DateTime now = rtc.now();
   lcd.setCursor(8, 1);
@@ -351,6 +352,8 @@ void LCDDigitalOutputUpdate()
 
 void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
 {
+  return;
+  
   //  lcd.setCursor(0, 1);
   //  lcd.print(status);
 
@@ -361,8 +364,6 @@ void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
   LCDPrintTwoDigits(now.minute());
   lcd.print(F(":"));
   LCDPrintTwoDigits(now.second());
-
-  return;
 
   if (!SD.begin(chipSelectSDCard))
   {
@@ -476,7 +477,7 @@ float GetWaterTempSensor()
   return (temp);
 }
 
-float GetPressureTransmitter()
+float GetPressureTransmitterMb()
 {
   int sensorVal = analogRead(A0);
   //Serial.print("Sensor Value: ");
@@ -496,5 +497,5 @@ float GetPressureTransmitter()
   //lcd.print(pressure_bar);
   //lcd.print(" bars");
 
-  return(pressure_bar * 100);
+  return(pressure_bar * 1000);
 }
