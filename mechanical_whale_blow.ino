@@ -15,17 +15,24 @@
 #define VERSION "Ver 0.3"
 #define MODIFIED "2020-03-09"
 
+#define SAMPLE_RATE 5
+
 #include <SPI.h>
 #include <SD.h>
 
-#include <Adafruit_MAX31865.h>
-// Use software SPI: CS, DI, DO, CLK
-Adafruit_MAX31865 max = Adafruit_MAX31865(3, 11, 12, 13);
-// The value of the Rref resistor. Use 430.0 for PT100 and 4300.0 for PT1000
-#define RREF      430.0
-// The 'nominal' 0-degrees-C resistance of the sensor
-// 100.0 for PT100, 1000.0 for PT1000
-#define RNOMINAL  100.0
+#include <OneWire.h> 
+#include <DallasTemperature.h>
+/********************************************************************/
+// Data wire is plugged into pin 2 on the Arduino 
+#define ONE_WIRE_BUS 7 
+/********************************************************************/
+// Setup a oneWire instance to communicate with any OneWire devices  
+// (not just Maxim/Dallas temperature ICs) 
+OneWire oneWire(ONE_WIRE_BUS); 
+/********************************************************************/
+// Pass our oneWire reference to Dallas Temperature. 
+DallasTemperature sensors(&oneWire);
+
 
 #include <DHT.h>;
 //Constants
@@ -53,6 +60,12 @@ bool bSDLogFail = false;
 int  iToggle = 0;
 
 File fileSDCard;
+
+int iHour = 0;
+int iMinute = 0;
+int iSecond = 0;
+
+int iPreSecond = -1;
 
 // change this to match your SD shield or module;
 // Arduino Ethernet shield: pin 4
@@ -82,12 +95,19 @@ void setup()
     ; // wait for serial port to connect. Needed for native USB port only
   }
 
+  Serial.println("++++++++++++++++++++");
+  Serial.println("");
+  Serial.println("Mechanical Whale Blow");
+  Serial.print(VERSION);
+  Serial.print(" ");
+  Serial.println(MODIFIED);  
+
   Wire.begin();
 
   pinMode(heaterPin, OUTPUT);
   digitalWrite(heaterPin, LOW);
 
-  max.begin(MAX31865_3WIRE);
+  sensors.begin();
 
   dht1.begin();
   dht2.begin();
@@ -153,7 +173,12 @@ void setup()
 
 void loop()
 {
-  LCDDigitalOutputUpdate();
+  now = rtc.now();
+  iHour = now.hour();
+  iMinute = now.minute();
+  iSecond = now.second();
+  if ((iSecond % SAMPLE_RATE) == 0)
+    LCDDigitalOutputUpdate();
   delay(1000);
 }
 
@@ -176,15 +201,12 @@ void LCDPrintThreeDigits(float fVal)
 
 void SetupSDCardOperations()
 {
-  return;
-  
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print(F("*** STATUS ***  "));
   lcd.setCursor(0, 1);
   lcd.print(F("SD Init Start   "));
 
-  pinMode(10, OUTPUT);
   if (!SD.begin(chipSelectSDCard)) {
     lcd.clear();
     lcd.setCursor(0, 0);
@@ -210,11 +232,17 @@ void SetupSDCardOperations()
     {
       if (fileSDCard.available())
       {
-        char strClockSetting[128];
+        char strClockSetting[256];
         fileSDCard.read(strClockSetting, sizeof(strClockSetting));
         strClockSetting[sizeof(strClockSetting)] = '\0';
+        char *ptr1 = strchr(&strClockSetting[0],'\n');
+        if (ptr1 != 0)
+        {
+            *ptr1++ = '\0';
+        }
+Serial.println("Set Clock:");
+Serial.println(strClockSetting);
         int iDateTime[6] = {0, 0, 0, 0, 0, 0};
-        char *ptr1 = &strClockSetting[0];
         for (int i = 0; i < 6; i++)
         {
           char *ptr2 = strchr(ptr1, ',');
@@ -222,6 +250,9 @@ void SetupSDCardOperations()
           {
             *ptr2 = '\0';
             iDateTime[i] = atoi(ptr1);
+Serial.print(i);
+Serial.print(" ");
+Serial.println(iDateTime[i]);
             ptr1 = &ptr2[1];
           }
           else
@@ -321,13 +352,12 @@ void LCDDigitalOutputUpdate()
 
   PR = GetPressureTransmitterMb();
 
-  DateTime now = rtc.now();
   lcd.setCursor(8, 1);
-  LCDPrintTwoDigits(now.hour());
+  LCDPrintTwoDigits(iHour);
   lcd.print(F(":"));
-  LCDPrintTwoDigits(now.minute());
+  LCDPrintTwoDigits(iMinute);
   lcd.print(F(":"));
-  LCDPrintTwoDigits(now.second());
+  LCDPrintTwoDigits(iSecond);
 
   // "H1_ T1_ H2_ T2_ "
   // "PR_ TS_ HH:MM:SS"
@@ -352,18 +382,10 @@ void LCDDigitalOutputUpdate()
 
 void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
 {
-  return;
+//  return;
   
   //  lcd.setCursor(0, 1);
   //  lcd.print(status);
-
-  DateTime now = rtc.now();
-  lcd.setCursor(8, 1);
-  LCDPrintTwoDigits(now.hour());
-  lcd.print(F(":"));
-  LCDPrintTwoDigits(now.minute());
-  lcd.print(F(":"));
-  LCDPrintTwoDigits(now.second());
 
   if (!SD.begin(chipSelectSDCard))
   {
@@ -394,9 +416,9 @@ void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
       fileSDCard.print(now.day(), DEC);
       fileSDCard.print(",");
       fileSDCard.print(now.hour(), DEC);
-      fileSDCard.print(" ");
+      fileSDCard.print(":");
       fileSDCard.print(now.minute(), DEC);
-      fileSDCard.print(" ");
+      fileSDCard.print(":");
       fileSDCard.print(now.second(), DEC);
       fileSDCard.print(",");
       fileSDCard.print(status);
@@ -430,51 +452,12 @@ void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
 
 float GetWaterTempSensor()
 {
-  //  max.begin(MAX31865_3WIRE);
-
   float celsius = 0.0;
-  // Call watertempsensor.requestTemperatures() to issue a global temperature and Requests to all devices on the bus
-  //  watertempsensor.requestTemperatures();
-  //  celsius = watertempsensor.getTempCByIndex(0);
 
-  uint16_t rtd = max.readRTD();
-  double temp = max.temperature(RNOMINAL, RREF);
-  uint8_t fault = false;
+ sensors.requestTemperatures(); // Send the command to get temperature readings 
+ celsius = sensors.getTempCByIndex(0);
 
-  //  Serial.print("RTD value: "); Serial.println(rtd);
-  float ratio = rtd;
-  ratio /= 32768;
-  //  Serial.print("Ratio = "); Serial.println(ratio,8);
-  //  Serial.print("Resistance = "); Serial.println(RREF*ratio,8);
-  //  Serial.print("Temperature = "); Serial.println(max.temperature(RNOMINAL, RREF));
-
-
-  fault = max.readFault();
-  if (fault)
-  {
-    Serial.print(" Fault 0x"); Serial.print(fault, HEX);
-    if (fault & MAX31865_FAULT_HIGHTHRESH) {
-      Serial.println(" RTD High Threshold");
-    }
-    if (fault & MAX31865_FAULT_LOWTHRESH) {
-      Serial.println(" RTD Low Threshold");
-    }
-    if (fault & MAX31865_FAULT_REFINLOW) {
-      Serial.println(" REFIN- > 0.85 x Bias");
-    }
-    if (fault & MAX31865_FAULT_REFINHIGH) {
-      Serial.println(" REFIN- < 0.85 x Bias - FORCE- open");
-    }
-    if (fault & MAX31865_FAULT_RTDINLOW) {
-      Serial.println(" RTDIN- < 0.85 x Bias - FORCE- open");
-    }
-    if (fault & MAX31865_FAULT_OVUV) {
-      Serial.println(" Under/Over voltage");
-    }
-    max.clearFault();
-  }
-
-  return (temp);
+ return(celsius);
 }
 
 float GetPressureTransmitterMb()
