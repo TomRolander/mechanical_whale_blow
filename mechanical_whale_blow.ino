@@ -12,7 +12,7 @@
 
  **************************************************************************/
 
-#define VERSION "Ver 0.3"
+#define VERSION "Ver 0.4"
 #define MODIFIED "2020-03-09"
 
 #define SAMPLE_RATE 5
@@ -61,6 +61,9 @@ int  iToggle = 0;
 
 File fileSDCard;
 
+int iYear = 0;
+int iMonth = 0;
+int iDay = 0;
 int iHour = 0;
 int iMinute = 0;
 int iSecond = 0;
@@ -144,21 +147,39 @@ void setup()
     // following line sets the RTC to the date & time this sketch was compiled
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   }
-  DateTime now = rtc.now();
+  now = rtc.now();
+  iYear = now.year();
+  iMonth = now.month();
+  iDay = now.day();
+  iHour = now.hour();
+  iMinute = now.minute();
+  iSecond = now.second();
 
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print(F("*** DATE ***    "));
   lcd.setCursor(0, 1);
-  lcd.print(now.year(), DEC);
+  lcd.print(iYear, DEC);
   lcd.print(F("/"));
-  LCDPrintTwoDigits(now.month());
+  LCDPrintTwoDigits(iMonth);
   lcd.print(F("/"));
-  LCDPrintTwoDigits(now.day());
+  LCDPrintTwoDigits(iDay);
   lcd.print(F(" "));
-  LCDPrintTwoDigits(now.hour());
+  LCDPrintTwoDigits(iHour);
   lcd.print(F(":"));
-  LCDPrintTwoDigits(now.minute());
+  LCDPrintTwoDigits(iMinute);
+
+Serial.print(iYear);
+Serial.print("/");
+Serial.print(iMonth);
+Serial.print("/");
+Serial.print(iDay);
+Serial.print(" ");
+Serial.print(iHour);
+Serial.print(":");
+Serial.print(iMinute);
+Serial.println("");
+  
   delay(2000);
 
   SetupSDCardOperations();
