@@ -1,3 +1,5 @@
+#include <HID.h>
+
 /**************************************************************************
   Mechanical Whale Blow
 
@@ -12,8 +14,8 @@
 
  **************************************************************************/
 
-#define VERSION "Ver 0.4"
-#define MODIFIED "2020-03-09"
+#define VERSION "Ver 0.5"
+#define MODIFIED "2020-03-12"
 
 #define SAMPLE_RATE 5
 
@@ -24,7 +26,7 @@
 #include <DallasTemperature.h>
 /********************************************************************/
 // Data wire is plugged into pin 2 on the Arduino 
-#define ONE_WIRE_BUS 7 
+#define ONE_WIRE_BUS 9 
 /********************************************************************/
 // Setup a oneWire instance to communicate with any OneWire devices  
 // (not just Maxim/Dallas temperature ICs) 
@@ -36,13 +38,15 @@ DallasTemperature sensors(&oneWire);
 
 #include <DHT.h>;
 //Constants
-#define DHT1PIN 5     // what pin we're connected to
-#define DHT2PIN 4     // what pin we're connected to
+#define DHT1PIN A2     // what pin we're connected to
+#define DHT2PIN A3     // what pin we're connected to
 #define DHTTYPE DHT22   // DHT 22  (AM2302)
 DHT dht1(DHT1PIN, DHTTYPE); //// Initialize DHT sensor for normal 16mhz Arduino
 DHT dht2(DHT2PIN, DHTTYPE); //// Initialize DHT sensor for normal 16mhz Arduino
 
-const int heaterPin =  6;
+const int HEATERPIN =  A1;
+
+const int DIAGNOSTICPIN = 8;
 
 float T1 = 0.0;
 float H1 = 0.0;
@@ -86,7 +90,7 @@ DateTime now;
 
 #include <LiquidCrystal.h>
 
-const int rs = 8, en = 9, d4 = A3, d5 = A2, d6 = A1, d7 = 2;
+const int rs = 6, en = 7, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 void setup()
@@ -107,8 +111,10 @@ void setup()
 
   Wire.begin();
 
-  pinMode(heaterPin, OUTPUT);
-  digitalWrite(heaterPin, LOW);
+  pinMode(HEATERPIN, OUTPUT);
+  digitalWrite(HEATERPIN, LOW);
+
+  pinMode(DIAGNOSTICPIN, INPUT_PULLUP);
 
   sensors.begin();
 
@@ -201,6 +207,7 @@ void loop()
   if ((iSecond % SAMPLE_RATE) == 0)
     LCDDigitalOutputUpdate();
   delay(1000);
+  Serial.println(digitalRead(DIAGNOSTICPIN));
 }
 
 void LCDPrintTwoDigits(int iVal)
@@ -361,17 +368,19 @@ void LCDDigitalOutputUpdate()
   if (TS < LO_TEMP)
   {
     bHeat = true;
-    digitalWrite(heaterPin, HIGH);
+    digitalWrite(HEATERPIN, HIGH);
     //Serial.println("HeatON");
   }
   else if (TS > HI_TEMP)
   {
     bHeat = false;
-    digitalWrite(heaterPin, LOW);
+    digitalWrite(HEATERPIN, LOW);
     //Serial.println("HeatOFF");
   }
 
   PR = GetPressureTransmitterMb();
+  if (PR < 0.0)
+    PR = 0.0;
 
   lcd.setCursor(8, 1);
   LCDPrintTwoDigits(iHour);
