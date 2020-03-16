@@ -13,11 +13,13 @@
  **************************************************************************/
 
 #define VERSION "Ver 0.6"
-#define MODIFIED "2020-03-15"
+#define MODIFIED "2020-03-16"
 
 #define SAMPLE_RATE 5 // Sample at 5 second frequency
 
 #define MODE_NORMAL 0
+
+#define DEBUG_SERIAL_PRINT  1
 
 #include <SPI.h>
 #include <SD.h>
@@ -25,7 +27,7 @@
 #include <OneWire.h> 
 #include <DallasTemperature.h>
 /********************************************************************/
-// Data wire is plugged into pin 2 on the Arduino 
+// Data wire is plugged into pin 9 on the Arduino 
 #define ONE_WIRE_BUS 9 
 /********************************************************************/
 // Setup a oneWire instance to communicate with any OneWire devices  
@@ -50,6 +52,8 @@ const int SLIDERSWITCHPIN = 8;
 
 const int PRESSUREPIN = A0;
 
+/********************************************************************/
+// Global data 
 float T1 = 0.0;
 float H1 = 0.0;
 float T2 = 0.0;
@@ -57,8 +61,8 @@ float H2 = 0.0;
 float PR = 0.0;
 float TS = 0.0;
 
-float LO_TEMP = 36.0;
-float HI_TEMP = 38.0;
+const float LO_TEMP = 36.0;
+const float HI_TEMP = 38.0;
 
 bool bHeat = false;
 bool bHeatState = false;
@@ -79,8 +83,6 @@ int iDay = 0;
 int iHour = 0;
 int iMinute = 0;
 int iSecond = 0;
-
-int iPreSecond = -1;
 
 // change this to match your SD shield or module;
 // Arduino Ethernet shield: pin 4
@@ -110,12 +112,14 @@ void setup()
     ; // wait for serial port to connect. Needed for native USB port only
   }
 
+#if DEBUG_SERIAL_PRINT
   Serial.println(F("++++++++++++++++++++"));
   Serial.println("");
   Serial.println(F("Mechanical Whale Blow"));
   Serial.print(F(VERSION));
   Serial.print(F(" "));
   Serial.println(F(MODIFIED));  
+#endif
 
   Wire.begin();
 
@@ -183,16 +187,18 @@ void setup()
   lcd.print(F(":"));
   LCDPrintTwoDigits(iMinute);
 
-Serial.print(iYear);
-Serial.print("/");
-SerialPrintTwoDigits(iMonth);
-Serial.print("/");
-SerialPrintTwoDigits(iDay);
-Serial.print(" ");
-SerialPrintTwoDigits(iHour);
-Serial.print(":");
-SerialPrintTwoDigits(iMinute);
-Serial.println("");
+#if DEBUG_SERIAL_PRINT
+  Serial.print(iYear);
+  Serial.print("/");
+  SerialPrintTwoDigits(iMonth);
+  Serial.print("/");
+  SerialPrintTwoDigits(iDay);
+  Serial.print(" ");
+  SerialPrintTwoDigits(iHour);
+  Serial.print(":");
+  SerialPrintTwoDigits(iMinute);
+  Serial.println("");
+#endif
   
   delay(2000);
 
@@ -234,8 +240,10 @@ void DoSlideSwitch()
   if (iSlideSwitch != iSlideSwitchState)
   {
     iSlideSwitchState = iSlideSwitch;
+#if DEBUG_SERIAL_PRINT
     Serial.print(F("Slide Switch = "));
     Serial.println(iSlideSwitch);
+#endif
   }
 }
 
@@ -304,8 +312,10 @@ void SetupSDCardOperations()
         {
             *ptr1++ = '\0';
         }
-Serial.println("Set Clock:");
-Serial.println(strClockSetting);
+#if DEBUG_SERIAL_PRINT
+        Serial.println("Set Clock:");
+        Serial.println(strClockSetting);
+#endif
         int iDateTime[6] = {0, 0, 0, 0, 0, 0};
         for (int i = 0; i < 6; i++)
         {
@@ -314,9 +324,11 @@ Serial.println(strClockSetting);
           {
             *ptr2 = '\0';
             iDateTime[i] = atoi(ptr1);
-Serial.print(i);
-Serial.print(" ");
-Serial.println(iDateTime[i]);
+#if DEBUG_SERIAL_PRINT
+            Serial.print(i);
+            Serial.print(" ");
+            Serial.println(iDateTime[i]);
+#endif
             ptr1 = &ptr2[1];
           }
           else
@@ -416,7 +428,9 @@ void SetHeater()
     {
       digitalWrite(HEATERPIN, HIGH);
       bHeatState = true;
+#if DEBUG_SERIAL_PRINT
       Serial.println("HeatON");
+#endif      
     }
   }
   else if (TS > HI_TEMP)
@@ -426,7 +440,9 @@ void SetHeater()
     {
       digitalWrite(HEATERPIN, LOW);
       bHeatState = false;
+#if DEBUG_SERIAL_PRINT
       Serial.println("HeatOFF");
+#endif
     }
   }
 }
@@ -538,22 +554,18 @@ float GetWaterTempSensor()
 float GetPressureTransmitterMb()
 {
   int sensorVal = analogRead(PRESSUREPIN);
-  //Serial.print("Sensor Value: ");
-  //Serial.print(sensorVal);
-
   float voltage = (sensorVal * 5.0) / 1024.0;
-  //Serial.print("  Volts: ");
-  //Serial.print(voltage);
-
   float pressure_pascal = (3.0 * ((float)voltage - 0.47)) * 1000000.0;
   float pressure_bar = pressure_pascal / 10e5;
-  //Serial.print("  Pressure = ");
-  //Serial.print(pressure_bar);
-  //Serial.println(" bars");
 
-  //lcd.setCursor(0, 1);
-  //lcd.print(pressure_bar);
-  //lcd.print(" bars");
-
+#if DEBUG_SERIAL_PRINT
+  Serial.print("Sensor Value: ");
+  Serial.print(sensorVal);
+  Serial.print("  Volts: ");
+  Serial.print(voltage);
+  Serial.print("  Pressure = ");
+  Serial.print(pressure_bar);
+  Serial.println(" bars");
+#endif
   return(pressure_bar * 1000);
 }
