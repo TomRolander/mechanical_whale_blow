@@ -46,7 +46,9 @@ DHT dht2(DHT2PIN, DHTTYPE); //// Initialize DHT sensor for normal 16mhz Arduino
 
 const int HEATERPIN =  A1;
 
-const int DIAGNOSTICPIN = 8;
+const int SLIDERSWITCHPIN = 8;
+
+const int PRESSUREPIN = A0;
 
 float T1 = 0.0;
 float H1 = 0.0;
@@ -120,7 +122,7 @@ void setup()
   pinMode(HEATERPIN, OUTPUT);
   digitalWrite(HEATERPIN, LOW);
 
-  pinMode(DIAGNOSTICPIN, INPUT_PULLUP);
+  pinMode(SLIDERSWITCHPIN, INPUT_PULLUP);
 
   sensors.begin();
 
@@ -228,7 +230,7 @@ void loop()
 
 void DoSlideSwitch()
 {
-  iSlideSwitch = digitalRead(DIAGNOSTICPIN);
+  iSlideSwitch = digitalRead(SLIDERSWITCHPIN);
   if (iSlideSwitch != iSlideSwitchState)
   {
     iSlideSwitchState = iSlideSwitch;
@@ -535,7 +537,7 @@ float GetWaterTempSensor()
 
 float GetPressureTransmitterMb()
 {
-  int sensorVal = analogRead(A0);
+  int sensorVal = analogRead(PRESSUREPIN);
   //Serial.print("Sensor Value: ");
   //Serial.print(sensorVal);
 
