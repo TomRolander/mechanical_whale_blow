@@ -1,5 +1,3 @@
-#include <HID.h>
-
 /**************************************************************************
   Mechanical Whale Blow
 
@@ -14,10 +12,12 @@
 
  **************************************************************************/
 
-#define VERSION "Ver 0.5"
-#define MODIFIED "2020-03-12"
+#define VERSION "Ver 0.6"
+#define MODIFIED "2020-03-15"
 
-#define SAMPLE_RATE 5
+#define SAMPLE_RATE 5 // Sample at 5 second frequency
+
+#define MODE_NORMAL 0
 
 #include <SPI.h>
 #include <SD.h>
@@ -59,6 +59,12 @@ float LO_TEMP = 36.0;
 float HI_TEMP = 38.0;
 
 bool bHeat = false;
+bool bHeatState = false;
+
+int iSlideSwitch = 0;
+int iSlideSwitchState = 0;
+
+int iMode = MODE_NORMAL;
 
 bool bSDLogFail = false;
 int  iToggle = 0;
@@ -102,12 +108,12 @@ void setup()
     ; // wait for serial port to connect. Needed for native USB port only
   }
 
-  Serial.println("++++++++++++++++++++");
+  Serial.println(F("++++++++++++++++++++"));
   Serial.println("");
-  Serial.println("Mechanical Whale Blow");
-  Serial.print(VERSION);
-  Serial.print(" ");
-  Serial.println(MODIFIED);  
+  Serial.println(F("Mechanical Whale Blow"));
+  Serial.print(F(VERSION));
+  Serial.print(F(" "));
+  Serial.println(F(MODIFIED));  
 
   Wire.begin();
 
@@ -177,13 +183,13 @@ void setup()
 
 Serial.print(iYear);
 Serial.print("/");
-Serial.print(iMonth);
+SerialPrintTwoDigits(iMonth);
 Serial.print("/");
-Serial.print(iDay);
+SerialPrintTwoDigits(iDay);
 Serial.print(" ");
-Serial.print(iHour);
+SerialPrintTwoDigits(iHour);
 Serial.print(":");
-Serial.print(iMinute);
+SerialPrintTwoDigits(iMinute);
 Serial.println("");
   
   delay(2000);
@@ -204,10 +210,38 @@ void loop()
   iHour = now.hour();
   iMinute = now.minute();
   iSecond = now.second();
-  if ((iSecond % SAMPLE_RATE) == 0)
-    LCDDigitalOutputUpdate();
+
+  if (iMode == MODE_NORMAL)
+  {
+    if ((iSecond % SAMPLE_RATE) == 0)
+    {
+      GetReadings();
+      UpdateLCD();
+      SetHeater();
+      SDLogging(bHeat ? F("HeatON") : F("HeatOFF"));
+    }
+  }
   delay(1000);
-  Serial.println(digitalRead(DIAGNOSTICPIN));
+
+  DoSlideSwitch();
+}
+
+void DoSlideSwitch()
+{
+  iSlideSwitch = digitalRead(DIAGNOSTICPIN);
+  if (iSlideSwitch != iSlideSwitchState)
+  {
+    iSlideSwitchState = iSlideSwitch;
+    Serial.print(F("Slide Switch = "));
+    Serial.println(iSlideSwitch);
+  }
+}
+
+void SerialPrintTwoDigits(int iVal)
+{
+  if (iVal < 10)
+    Serial.print(F("0"));
+  Serial.print(iVal, DEC);
 }
 
 void LCDPrintTwoDigits(int iVal)
@@ -353,34 +387,53 @@ Serial.println(iDateTime[i]);
   delay(2000);
   lcd.clear();
 
-  LCDStatusUpdate_SDLogging(F("StartUp "));
+  SDLogging(F("StartUp "));
 }
 
-
-void LCDDigitalOutputUpdate()
+void GetReadings()
 {
+  // Get Humidity and Temperature for Lung and Diaphragm
   H1 = dht1.readHumidity();
   T1 = dht1.readTemperature();
   H2 = dht2.readHumidity();
   T2 = dht2.readTemperature();
 
-  TS = GetWaterTempSensor();
+  TS = GetWaterTempSensor();  
+
+  PR = GetPressureTransmitterMb();
+  if (PR < 0.0)
+    PR = 0.0;  
+}
+
+void SetHeater()
+{
   if (TS < LO_TEMP)
   {
     bHeat = true;
-    digitalWrite(HEATERPIN, HIGH);
-    //Serial.println("HeatON");
+    if (bHeatState == false)
+    {
+      digitalWrite(HEATERPIN, HIGH);
+      bHeatState = true;
+      Serial.println("HeatON");
+    }
   }
   else if (TS > HI_TEMP)
   {
     bHeat = false;
-    digitalWrite(HEATERPIN, LOW);
-    //Serial.println("HeatOFF");
+    if (bHeatState == true)
+    {
+      digitalWrite(HEATERPIN, LOW);
+      bHeatState = false;
+      Serial.println("HeatOFF");
+    }
   }
+}
 
-  PR = GetPressureTransmitterMb();
-  if (PR < 0.0)
-    PR = 0.0;
+
+void UpdateLCD()
+{
+  // "H1_ T1_ H2_ T2_ "
+  // "PR_ TS_ HH:MM:SS"
 
   lcd.setCursor(8, 1);
   LCDPrintTwoDigits(iHour);
@@ -388,9 +441,6 @@ void LCDDigitalOutputUpdate()
   LCDPrintTwoDigits(iMinute);
   lcd.print(F(":"));
   LCDPrintTwoDigits(iSecond);
-
-  // "H1_ T1_ H2_ T2_ "
-  // "PR_ TS_ HH:MM:SS"
 
   lcd.setCursor(0, 0);
   LCDPrintThreeDigits(H1);
@@ -406,17 +456,10 @@ void LCDDigitalOutputUpdate()
   lcd.print(F(" "));
   LCDPrintThreeDigits(TS);
   lcd.print(F(" "));
-
-  LCDStatusUpdate_SDLogging(bHeat ? F("HeatON") : F("HeatOFF"));
 }
 
-void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
+void SDLogging(const __FlashStringHelper*status)
 {
-//  return;
-  
-  //  lcd.setCursor(0, 1);
-  //  lcd.print(status);
-
   if (!SD.begin(chipSelectSDCard))
   {
     bSDLogFail = true;
