@@ -19,7 +19,7 @@
 
 #define MODE_NORMAL 0
 
-#define DEBUG_SERIAL_PRINT  1
+#define DEBUG_SERIAL_PRINT  0
 
 #include <SPI.h>
 #include <SD.h>
