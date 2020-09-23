@@ -12,8 +12,8 @@
 
  **************************************************************************/
 
-#define VERSION "Ver 0.7"
-#define MODIFIED "2020-03-23"
+#define VERSION "Ver 0.6"
+#define MODIFIED "2020-03-16"
 
 #define SAMPLE_RATE 5 // Sample at 5 second frequency
 
@@ -470,8 +470,7 @@ void UpdateLCD()
   LCDPrintThreeDigits(T2);
   lcd.print(F(" "));
   lcd.setCursor(0, 1);
-//  LCDPrintThreeDigits(PR);
-  LCDPrintThreeDigits(PR * 100.0);
+  LCDPrintThreeDigits(PR);
   lcd.print(F(" "));
   LCDPrintThreeDigits(TS);
   lcd.print(F(" "));
@@ -556,12 +555,8 @@ float GetPressureTransmitterMb()
 {
   int sensorVal = analogRead(PRESSUREPIN);
   float voltage = (sensorVal * 5.0) / 1024.0;
-//  float pressure_pascal = (3.0 * ((float)voltage - 0.47)) * 1000000.0;
-//  float pressure_bar = pressure_pascal / 10e5;
-  float pressure_bar = 3.0 * ((float)voltage - 0.47);
-  int iPressureBar = (int) pressure_bar;
-  float psi = pressure_bar * 0.0145;
-  
+  float pressure_pascal = (3.0 * ((float)voltage - 0.47)) * 1000000.0;
+  float pressure_bar = pressure_pascal / 10e5;
 
 #if DEBUG_SERIAL_PRINT
   Serial.print("Sensor Value: ");
@@ -571,14 +566,6 @@ float GetPressureTransmitterMb()
   Serial.print("  Pressure = ");
   Serial.print(pressure_bar);
   Serial.println(" bars");
-  Serial.print("  Millibars = ");
-  Serial.print(iPressureBar);
-  Serial.println(" bars");
-  Serial.print("  PSI = ");
-  Serial.print(psi);
-  Serial.println("");
-  
 #endif
-//  return(pressure_bar * 1000);
-  return(psi);
+  return(pressure_bar * 1000);
 }
