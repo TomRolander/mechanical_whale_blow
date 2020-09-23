@@ -471,7 +471,7 @@ void UpdateLCD()
   lcd.print(F(" "));
   lcd.setCursor(0, 1);
 //  LCDPrintThreeDigits(PR);
-  LCDPrintThreeDigits(PR * 100.0);
+  LCDPrintThreeDigits(PR * 10.0);
   lcd.print(F(" "));
   LCDPrintThreeDigits(TS);
   lcd.print(F(" "));
