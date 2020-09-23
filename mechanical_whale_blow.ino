@@ -19,7 +19,7 @@
 
 #define MODE_NORMAL 0
 
-#define DEBUG_SERIAL_PRINT  0
+#define DEBUG_SERIAL_PRINT  1
 
 #include <SPI.h>
 #include <SD.h>
@@ -554,14 +554,13 @@ float GetWaterTempSensor()
 
 float GetPressureTransmitterMb()
 {
+#if 0
   int sensorVal = analogRead(PRESSUREPIN);
   float voltage = (sensorVal * 5.0) / 1024.0;
-//  float pressure_pascal = (3.0 * ((float)voltage - 0.47)) * 1000000.0;
-//  float pressure_bar = pressure_pascal / 10e5;
-  float pressure_bar = 3.0 * ((float)voltage - 0.47);
-  int iPressureBar = (int) pressure_bar;
-  float psi = pressure_bar * 0.0145;
-  
+  float pressure_pascal = (3.0 * ((float)voltage - 0.47)) * 1000000.0;
+  float pressure_bar = pressure_pascal / 10e5;
+  float psi = pressure_bar * 14.5038;
+  float new_psi = (250.0 * (voltage / 3.0)) - 25.0;
 
 #if DEBUG_SERIAL_PRINT
   Serial.print("Sensor Value: ");
@@ -570,15 +569,31 @@ float GetPressureTransmitterMb()
   Serial.print(voltage);
   Serial.print("  Pressure = ");
   Serial.print(pressure_bar);
-  Serial.println(" bars");
-  Serial.print("  Millibars = ");
-  Serial.print(iPressureBar);
-  Serial.println(" bars");
+  Serial.print(" bars");
   Serial.print("  PSI = ");
   Serial.print(psi);
-  Serial.println("");
-  
+  Serial.print("  New Pressure = ");
+  Serial.println(new_psi);  
 #endif
-//  return(pressure_bar * 1000);
   return(psi);
+#endif
+
+const float pressureZero = 102.4; //analog reading of pressure transducer at 0psi
+const float pressureMax = 921.6; //analog reading of pressure transducer at 100psi
+const float pressuretransducermaxPSI = 200.0; //psi value of transducer being used
+
+float pressureReading = 0.0;
+float pressureValue = 0.0;
+
+pressureReading = (float) analogRead(PRESSUREPIN);
+pressureValue = ((pressureReading-pressureZero)*pressuretransducermaxPSI)/(pressureMax-pressureZero); 
+
+#if DEBUG_SERIAL_PRINT
+  Serial.print("Sensor Value: ");
+  Serial.print(pressureReading);
+  Serial.print("  PSI = ");
+  Serial.println(pressureValue);
+#endif
+
+  return(pressureValue);
 }
