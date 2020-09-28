@@ -589,29 +589,10 @@ pressureReading = (float) analogRead(PRESSUREPIN);
 pressureValue = ((pressureReading-pressureZero)*pressuretransducermaxPSI)/(pressureMax-pressureZero); 
 
 #if DEBUG_SERIAL_PRINT
-  if (iHour<10) Serial.print("0");
-  Serial.print(iHour);
-  Serial.print(":");
-  if (iMinute<10) Serial.print("0");
-  Serial.print(iMinute);
-  Serial.print(":");
-  if (iSecond<10) Serial.print("0");
-  Serial.print(iSecond);
-
-  Serial.print(" H1=");
-  Serial.print(H1);
-  Serial.print(" T1=");
-  Serial.print(T1);
-  Serial.print(" H2=");
-  Serial.print(H2);
-  Serial.print(" T2=");
-  Serial.print(T2);
-  Serial.print(" TS=");
-  Serial.print(TS);
-  Serial.print(" PSI=");
-  Serial.print(pressureValue);
-  Serial.print(" SV=");
-  Serial.println(pressureReading);
+  Serial.print("Sensor Value: ");
+  Serial.print(pressureReading);
+  Serial.print("  PSI = ");
+  Serial.println(pressureValue);
 #endif
 
   return(pressureValue);
