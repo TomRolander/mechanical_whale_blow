@@ -12,8 +12,8 @@
 
  **************************************************************************/
 
-#define VERSION "Ver 0.7"
-#define MODIFIED "2020-03-23"
+#define VERSION "Ver 0.8"
+#define MODIFIED "2020-09-28"
 
 #define SAMPLE_RATE 5 // Sample at 5 second frequency
 
@@ -414,7 +414,7 @@ void GetReadings()
 
   TS = GetWaterTempSensor();  
 
-  PR = GetPressureTransmitterMb();
+  PR = GetPressureTransmitterPSI();
   if (PR < 0.0)
     PR = 0.0;  
 }
@@ -552,7 +552,7 @@ float GetWaterTempSensor()
  return(celsius);
 }
 
-float GetPressureTransmitterMb()
+float GetPressureTransmitterPSI()
 {
 #if 0
   int sensorVal = analogRead(PRESSUREPIN);
