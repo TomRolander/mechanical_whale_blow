@@ -13,7 +13,7 @@
  **************************************************************************/
 
 #define VERSION "Ver 0.9"
-#define MODIFIED "2020-10-21"
+#define MODIFIED "2020-10-26"
 
 #define SAMPLE_RATE 5 // Sample at 5 second frequency
 
