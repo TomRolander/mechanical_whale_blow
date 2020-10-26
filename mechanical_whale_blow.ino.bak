@@ -69,6 +69,8 @@ bool bHeatState = false;
 
 int iSlideSwitch = 0;
 int iSlideSwitchState = 0;
+int iSlideSwitchStateOld = 0;
+unsigned long ulSlideSwitchStart = 0;
 
 int iMode = MODE_NORMAL;
 
@@ -83,6 +85,9 @@ int iDay = 0;
 int iHour = 0;
 int iMinute = 0;
 int iSecond = 0;
+
+int iPressureValue[250];
+int iPressureValueIndex = 0;
 
 // change this to match your SD shield or module;
 // Arduino Ethernet shield: pin 4
@@ -152,6 +157,9 @@ void setup()
     lcd.print(F("*** ERROR ***   "));
     lcd.setCursor(0, 1);
     lcd.print(F("Couldnt find RTC"));
+#if DEBUG_SERIAL_PRINT
+  Serial.println(F("Couldnt find RTC"));
+#endif
     while (1);
   }
   if (! rtc.initialized())
@@ -214,6 +222,82 @@ void setup()
 
 void loop()
 {
+  if (iSlideSwitchState == 1)
+  {
+    if (iSlideSwitchStateOld == 0)
+    {
+      //analogReference(INTERNAL);
+      while (1)
+      {
+        float reading = 0.0;
+        float volts500 = 0.0;
+        float volts475 = 0.0;
+        
+        reading = (float) analogRead(PRESSUREPIN);
+      
+        volts500 = reading * (5.0 / 1023.0);
+        volts475 = reading * (4.75 / 1023.0);
+        Serial.print("Raw = ");
+        Serial.print(reading);
+        Serial.print(" V5.00 = ");
+        Serial.print(volts500);
+        Serial.print(" V4.75 = ");
+        Serial.print(volts475);
+
+        float pressure_pascal500 = (3.0 * ((float)volts500 - 0.47)) * 1000000.0;
+        float pressure_bar500 = pressure_pascal500 / 10e5;
+        float psi500 = pressure_bar500 * 14.5038;
+        float pressure_pascal475 = (3.0 * ((float)volts475 - 0.47)) * 1000000.0;
+        float pressure_bar475 = pressure_pascal475 / 10e5;
+        float psi475 = pressure_bar475 * 14.5038;
+        Serial.print(" PSI5.00 = ");
+        Serial.print(psi500);
+        Serial.print(" PSI4.75 = ");
+        Serial.print(psi475);
+
+        const float pressureZero = 102.4; //analog reading of pressure transducer at 0psi
+        const float pressureMax = 921.6; //analog reading of pressure transducer at 100psi
+        const float pressuretransducermaxPSI = 100.0; //psi value of transducer being used
+        
+        float pressureValue = 0.0;
+        
+        pressureValue = ((reading-pressureZero)*pressuretransducermaxPSI)/(pressureMax-pressureZero); 
+
+        Serial.print(" PSIx = ");
+        Serial.println(pressureValue);
+        
+        delay(1000);        
+      }
+
+      
+      int iPR = (int) (GetPressureTransmitterPSI() * 10.0);
+      if (iPR < 0)
+        iPR = 0;
+      Serial.print("PSI=");
+      if (iPR < 100)
+        Serial.print("0");
+      if (iPR < 10)
+        Serial.print("0");
+      Serial.print(iPR);
+      Serial.print(" Ms=");
+      unsigned long time = millis();
+      if (ulSlideSwitchStart == 0)
+        ulSlideSwitchStart = time;
+      Serial.println(time - ulSlideSwitchStart);     
+    }
+    DoSlideSwitch();
+    if (iSlideSwitchState == 0)
+    {
+      // write out buffered pressure values
+    }
+    
+    return;
+  }
+  else
+  {
+    ulSlideSwitchStart = 0;
+  }
+  
   now = rtc.now();
   iHour = now.hour();
   iMinute = now.minute();
@@ -232,6 +316,7 @@ void loop()
   delay(1000);
 
   DoSlideSwitch();
+
 }
 
 void DoSlideSwitch()
@@ -239,6 +324,7 @@ void DoSlideSwitch()
   iSlideSwitch = digitalRead(SLIDERSWITCHPIN);
   if (iSlideSwitch != iSlideSwitchState)
   {
+    iSlideSwitchStateOld = iSlideSwitchState;
     iSlideSwitchState = iSlideSwitch;
 #if DEBUG_SERIAL_PRINT
     Serial.print(F("Slide Switch = "));
@@ -285,6 +371,9 @@ void SetupSDCardOperations()
     lcd.print(F("*** ERROR ***   "));
     lcd.setCursor(0, 1);
     lcd.print(F("SD Init Failed  "));
+#if DEBUG_SERIAL_PRINT
+    Serial.println(F("SD Init Failed"));
+#endif
     while (1);
   }
 
@@ -578,22 +667,55 @@ float GetPressureTransmitterPSI()
   return(psi);
 #endif
 
-const float pressureZero = 102.4; //analog reading of pressure transducer at 0psi
-const float pressureMax = 921.6; //analog reading of pressure transducer at 100psi
-const float pressuretransducermaxPSI = 200.0; //psi value of transducer being used
+  const float pressureZero = 102.4; //analog reading of pressure transducer at 0psi
+  const float pressureMax = 921.6; //analog reading of pressure transducer at 100psi
+  const float pressuretransducermaxPSI = 100.0; //psi value of transducer being used
+  
+  float pressureReading = 0.0;
+  float pressureValue = 0.0;
+  float volts = 0.0;
+  
+  pressureReading = (float) analogRead(PRESSUREPIN);
 
-float pressureReading = 0.0;
-float pressureValue = 0.0;
+  //volts = pressureReading * (5.0 / 1023.0);
+  volts = (pressureReading + 0.5) * (5.0 / 1024.0);
 
-pressureReading = (float) analogRead(PRESSUREPIN);
-pressureValue = ((pressureReading-pressureZero)*pressuretransducermaxPSI)/(pressureMax-pressureZero); 
+  if (pressureReading < pressureZero)
+    pressureReading = pressureZero;
+  if (pressureReading > pressureMax)
+    pressureReading = pressureMax;
+    
+  pressureValue = ((pressureReading-pressureZero)*pressuretransducermaxPSI)/(pressureMax-pressureZero); 
 
+  if (iSlideSwitchState == 0)
+  {
 #if DEBUG_SERIAL_PRINT
-  Serial.print("Sensor Value: ");
-  Serial.print(pressureReading);
-  Serial.print("  PSI = ");
-  Serial.println(pressureValue);
+    if (iHour<10) Serial.print("0");
+    Serial.print(iHour);
+    Serial.print(":");
+    if (iMinute<10) Serial.print("0");
+    Serial.print(iMinute);
+    Serial.print(":");
+    if (iSecond<10) Serial.print("0");
+    Serial.print(iSecond);
+  
+    Serial.print(" H1=");
+    Serial.print(H1);
+    Serial.print(" T1=");
+    Serial.print(T1);
+    Serial.print(" H2=");
+    Serial.print(H2);
+    Serial.print(" T2=");
+    Serial.print(T2);
+    Serial.print(" TS=");
+    Serial.print(TS);
+    Serial.print(" PSI=");
+    Serial.print(pressureValue);
+    Serial.print(" SV=");
+    Serial.print(pressureReading);
+    Serial.print(" V=");
+    Serial.println(volts);
 #endif
-
+  }
   return(pressureValue);
 }
