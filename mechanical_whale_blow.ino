@@ -12,8 +12,8 @@
 
  **************************************************************************/
 
-#define VERSION "Ver 0.9"
-#define MODIFIED "2020-10-26"
+#define VERSION "Ver 0.91"
+#define MODIFIED "2020-10-29"
 
 #define SAMPLE_RATE 5 // Sample at 5 second frequency
 
@@ -562,7 +562,7 @@ void UpdateLCD()
   lcd.print(F(" "));
   lcd.setCursor(0, 1);
 //  LCDPrintThreeDigits(PR);
-  LCDPrintThreeDigits(PR * 10.0);
+  LCDPrintThreeDigits((PR * 10.0) + 0.5);
   lcd.print(F(" "));
   LCDPrintThreeDigits(TS);
   lcd.print(F(" "));
@@ -685,9 +685,9 @@ float GetPressureTransmitterPSI()
 
 #if USE_ADS1115
         uint16_t adc0 = ads1115.readADC_SingleEnded(0);
-        rawReading = (float) adc0;
-        volts = rawReading * multiplier;
-        pressureValue = (volts/5.0)*pressuretransducermaxPSI;
+        rawReading = adc0;
+        volts = (rawReading * multiplier)/1000;
+        pressureValue = (volts/5.0)*pressuretransducermaxPSI;        
 #else
         rawReading = (float) analogRead(PRESSUREPIN);
         //volts = rawReading * (5.0 / 1023.0);
